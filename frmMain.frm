@@ -369,6 +369,13 @@ Sub Form_Resize()
 
 Text1.Width = frmMain.Width - 2415
 List1.Width = frmMain.Width - 495
-'Command2.Left = frmMain.Width - 14895
+Command2.Left = frmMain.Width - 5910
+Command4.Left = frmMain.Width - 3750
+Text2.Width = frmMain.Width - 1695
+Command3.Left = frmMain.Width - 1470
+List1.Height = frmMain.Height - 2760
+Text2.Top = frmMain.Height - 1140
+Command3.Top = frmMain.Height - 1140
 
 End Sub
+
