@@ -136,7 +136,6 @@ Private Declare Function ShellExecute Lib "shell32.dll" Alias "ShellExecuteA" (B
 Private Declare Function PathFileExists Lib "shlwapi.dll" Alias "PathFileExistsA" (ByVal pszPath As String) As Long
 Private Declare Function DeleteFile Lib "kernel32" Alias "DeleteFileA" (ByVal path As String) As Boolean
 
-Const SW_MAXIMIZE = 3
 Const SW_SHOWNORMAL = 1
 
 Dim StopSearch As Boolean ' остановить поиск
@@ -172,7 +171,7 @@ Private Function ExtractFileExt(ByVal strFileName As String) As String
  
 Dim strUp As String
 Dim dotPoint As Long
-strUp = UCase(strFileName) ' поднимаем регистр
+strUp = UCase$(strFileName) ' поднимаем регистр
 dotPoint = InStrRev(strUp, ".")
 If dotPoint > 0 Then
   ExtractFileExt = Right$(strUp, Len(strUp) - dotPoint)
@@ -202,7 +201,7 @@ hSearch = FindFirstFile(path & "*", WFD)
 If hSearch <> INVALID_HANDLE_VALUE Then
   Do While Cont
     If StopSearch Then Exit Sub
-    objName = Left(WFD.cFileName, InStr(WFD.cFileName, Chr(0)) - 1)
+    objName = Left$(WFD.cFileName, InStr(WFD.cFileName, Chr$(0)) - 1)
     If objName <> "." And objName <> ".." Then
       If GetFileAttributes(path & objName) = FILE_ATTRIBUTE_DIRECTORY Then    'Ведь без этого она не сможет отличить файл от папки?
         ProcessFiles path & objName & "\"
@@ -239,7 +238,7 @@ Private Sub cmdStartStop_Click()
 '
 ' Обработка
 
-If Right(Text1.Text, 1) <> "\" Then Text1.Text = Text1.Text & "\"
+If Right$(Text1.Text, 1) <> "\" Then Text1.Text = Text1.Text & "\"
 
 If SearchState Then
   StopSearch = True
@@ -305,7 +304,7 @@ If FileExists(LnkFile) Then
   If SlashPos = 0 Then Exit Sub
   
   Do While (SlashPos > 0) And (Not FileExists(LnkPath))
-    LnkPath = Left(LnkPath, SlashPos - 1)
+    LnkPath = Left$(LnkPath, SlashPos - 1)
     SlashPos = InStrRev(LnkPath, "\")
     If SlashPos = 0 Then Exit Sub
   Loop
@@ -336,7 +335,7 @@ Private Sub List1_KeyDown(KeyCode As Integer, Shift As Integer)
 
 Dim OneLnk As String
 Dim LnkCount As Long
-Dim MustDel
+Dim MustDel As Long
 Dim i As Long
 
 If KeyCode = 46 Then
