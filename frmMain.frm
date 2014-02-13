@@ -131,7 +131,6 @@ End Type
 Private Declare Function FindFirstFile Lib "kernel32" Alias "FindFirstFileA" (ByVal lpFileName As String, lpFindFileData As WIN32_FIND_DATA) As Long
 Private Declare Function FindNextFile Lib "kernel32" Alias "FindNextFileA" (ByVal hFindFile As Long, lpFindFileData As WIN32_FIND_DATA) As Long
 Private Declare Function FindClose Lib "kernel32" (ByVal hFindFile As Long) As Long
-Private Declare Function GetFileAttributes Lib "kernel32.dll" Alias "GetFileAttributesA" (ByVal lpFileName As String) As Long
 Private Declare Function ShellExecute Lib "shell32.dll" Alias "ShellExecuteA" (ByVal hwnd As Long, ByVal lpOperation As String, ByVal lpFile As String, ByVal lpParameters As String, ByVal lpDirectory As String, ByVal nShowCmd As Long) As Long
 Private Declare Function PathFileExists Lib "shlwapi.dll" Alias "PathFileExistsA" (ByVal pszPath As String) As Long
 Private Declare Function DeleteFile Lib "kernel32" Alias "DeleteFileA" (ByVal path As String) As Boolean
@@ -194,7 +193,11 @@ Dim FileName As String
 Dim FileExt As String
 Dim LnkPath As String
 
-Dim DoEventsCicle As Long
+Dim DoEventsCycle As Long
+
+On Error Resume Next
+
+WFD.cAlternate = 0
 
 Cont = True
 hSearch = FindFirstFile(path & "*", WFD)
@@ -223,9 +226,9 @@ If hSearch <> INVALID_HANDLE_VALUE Then
     Cont = FindNextFile(hSearch, WFD)
     Label2.Caption = "ќбработано " & FilesCount & " файлов, €рлыков " & LnkCount & ", из них битых " & BadLnk
     ' ќбновление интерфейса раз в 10 файлов
-    DoEventsCicle = DoEventsCicle + 1
-    If DoEventsCicle >= 10 Then
-      DoEventsCicle = 0
+    DoEventsCycle = DoEventsCycle + 1
+    If DoEventsCycle >= 10 Then
+      DoEventsCycle = 0
       DoEvents
     End If
   Loop
