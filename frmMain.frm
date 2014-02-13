@@ -203,7 +203,7 @@ If hSearch <> INVALID_HANDLE_VALUE Then
     If StopSearch Then Exit Sub
     objName = Left$(WFD.cFileName, InStr(WFD.cFileName, Chr$(0)) - 1)
     If objName <> "." And objName <> ".." Then
-      If GetFileAttributes(path & objName) = FILE_ATTRIBUTE_DIRECTORY Then    'Ведь без этого она не сможет отличить файл от папки?
+      If (WFD.dwFileAttributes And FILE_ATTRIBUTE_DIRECTORY) = FILE_ATTRIBUTE_DIRECTORY Then
         ProcessFiles path & objName & "\"
       Else
         ' Обработка файлов
