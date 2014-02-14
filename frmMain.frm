@@ -2,29 +2,13 @@ VERSION 5.00
 Begin VB.Form frmMain 
    Caption         =   "Проверка ярлыков"
    ClientHeight    =   10170
-   ClientLeft      =   120
-   ClientTop       =   450
+   ClientLeft      =   225
+   ClientTop       =   555
    ClientWidth     =   16710
    LinkTopic       =   "Form1"
    ScaleHeight     =   10170
    ScaleWidth      =   16710
    StartUpPosition =   3  'Windows Default
-   Begin VB.CommandButton Command4 
-      Caption         =   "Ближайший существующий каталог"
-      Height          =   400
-      Left            =   13200
-      TabIndex        =   8
-      Top             =   840
-      Width           =   3375
-   End
-   Begin VB.CommandButton Command2 
-      Caption         =   "Каталог с ярлыком"
-      Height          =   400
-      Left            =   11040
-      TabIndex        =   7
-      Top             =   840
-      Width           =   2055
-   End
    Begin VB.CommandButton Command3 
       Caption         =   "Изменить"
       Height          =   400
@@ -98,6 +82,28 @@ Begin VB.Form frmMain
       Top             =   945
       Width           =   6015
    End
+   Begin VB.Menu pm_List 
+      Caption         =   "й"
+      Visible         =   0   'False
+      Begin VB.Menu mi_OpenLnkFile 
+         Caption         =   "Открыть каталог с файлом ярлыка"
+      End
+      Begin VB.Menu mi_OpenFarFolder 
+         Caption         =   "Отклыть ближайший существующий каталог"
+      End
+      Begin VB.Menu mi_SaveList 
+         Caption         =   "Сохранить список ярлыков с файл"
+         Begin VB.Menu mi_SaveLnkFilesList 
+            Caption         =   "Список LNK файлв"
+         End
+         Begin VB.Menu mi_SaveDestFilesList 
+            Caption         =   "Список целей ярлыков"
+         End
+         Begin VB.Menu mi_SaveBothList 
+            Caption         =   "И то и то"
+         End
+      End
+   End
 End
 Attribute VB_Name = "frmMain"
 Attribute VB_GlobalNameSpace = False
@@ -128,12 +134,37 @@ Private Type WIN32_FIND_DATA
      cAlternate As String * 14
 End Type
 
+Private Type OPENFILENAME
+    lStructSize As Long
+    hwndOwner As Long
+    hInstance As Long
+    lpstrFilter As String
+    lpstrCustomFilter As String
+    nMaxCustFilter As Long
+    nFilterIndex As Long
+    lpstrFile As String
+    nMaxFile As Long
+    lpstrFileTitle As String
+    nMaxFileTitle As Long
+    lpstrInitialDir As String
+    lpstrTitle As String
+    flags As Long
+    nFileOffset As Integer
+    nFileExtension As Integer
+    lpstrDefExt As String
+    lCustData As Long
+    lpfnHook As Long
+    lpTemplateName As String
+End Type
+
 Private Declare Function FindFirstFile Lib "kernel32" Alias "FindFirstFileA" (ByVal lpFileName As String, lpFindFileData As WIN32_FIND_DATA) As Long
 Private Declare Function FindNextFile Lib "kernel32" Alias "FindNextFileA" (ByVal hFindFile As Long, lpFindFileData As WIN32_FIND_DATA) As Long
 Private Declare Function FindClose Lib "kernel32" (ByVal hFindFile As Long) As Long
 Private Declare Function ShellExecute Lib "shell32.dll" Alias "ShellExecuteA" (ByVal hwnd As Long, ByVal lpOperation As String, ByVal lpFile As String, ByVal lpParameters As String, ByVal lpDirectory As String, ByVal nShowCmd As Long) As Long
 Private Declare Function PathFileExists Lib "shlwapi.dll" Alias "PathFileExistsA" (ByVal pszPath As String) As Long
 Private Declare Function DeleteFile Lib "kernel32" Alias "DeleteFileA" (ByVal path As String) As Boolean
+Private Declare Function GetOpenFileName Lib "comdlg32.dll" Alias "GetOpenFileNameA" (pOpenfilename As OPENFILENAME) As Long
+Private Declare Function GetSaveFileName Lib "comdlg32.dll" Alias "GetSaveFileNameA" (pOpenfilename As OPENFILENAME) As Long
 
 Const SW_SHOWNORMAL = 1
 
@@ -142,8 +173,9 @@ Dim SearchState As Boolean ' True - работаем, False - не работаем
 Dim FilesCount As Long
 Dim LnkCount As Long
 Dim BadLnk As Long
+Dim BothPart As String
 
-Private Function GetLinkPath(ByVal lnk As String)
+Private Function GetLinkPath(ByVal lnk As String) As String
 '
 ' Получение пути, на который ссылается ярлык
 
@@ -155,6 +187,19 @@ On Error Resume Next
   End With
   
 End Function
+
+Private Sub SetLinkPath(ByVal lnkfile As String, ByVal lnk As String)
+'
+' Изменение пути, на который ссылается ярлык
+
+On Error Resume Next
+  With CreateObject("Wscript.Shell").CreateShortcut(lnkfile)
+    .TargetPath = Text2.Text
+    .Save
+    .Close
+  End With
+  
+End Sub
 
 Private Function FileExists(ByVal strFileName As String) As Boolean
 '
@@ -262,14 +307,14 @@ End If
 
 End Sub
 
-Private Sub Command2_Click()
+Private Sub mi_OpenLnkFile_Click()
 '
 ' Открыть каталог с ярлыком и выделить его
 
-Dim LnkFile As String
+Dim lnkfile As String
 
-LnkFile = List1.List(List1.ListIndex)
-If FileExists(LnkFile) Then ShellExecute frmMain.hwnd, "OPEN", "EXPLORER", "/select, " & LnkFile, 0, SW_SHOWNORMAL
+lnkfile = List1.List(List1.ListIndex)
+If FileExists(lnkfile) Then ShellExecute frmMain.hwnd, "OPEN", "EXPLORER", "/select, " & lnkfile, 0, SW_SHOWNORMAL
   
 End Sub
 
@@ -277,31 +322,62 @@ Private Sub Command3_Click()
 '
 ' Вносим изменения в ярлык
 
-Dim LnkFile As String
+Dim lnkfile As String
+Dim lnk As String
+Dim i As Long
 
-LnkFile = List1.List(List1.ListIndex)
-If FileExists(LnkFile) Then
-  On Error Resume Next
-    With CreateObject("Wscript.Shell").CreateShortcut(LnkFile)
-      .TargetPath = Text2.Text
-      .Save
-      .Close
-    End With
+' Если был выделен один файл - просто изменим его ссылку,
+' если выделено несколько файлов - спросим у пользователя как поступить:
+' 1. изменить у всех выделенных ярлыков общую часть в пути
+' 2. изменить у всех выделенных ярлыков всю ссылку нановый (когда несколько
+' ярлыков ссылаются на один файл
+
+If List1.SelCount = 1 Then
+  lnkfile = List1.List(List1.ListIndex)
+  If FileExists(lnkfile) Then
+    SetLinkPath lnkfile, Text2.Text
+  End If
+Else
+  ' Подготовим информативное сообщение для пользователя, чтобы не запутался
+  Select Case frmQuery.QueryMode("У объектов, на которые ссылаются выделенные Вами ярлыки имеется " & _
+  "следующая общая часть:" & vbCrLf & BothPart & vbCrLf & vbCrLf & _
+  "Заменить в выделеных ярлыках общую часть пути на новую, или просто обновить ссылку?")
+    Case 0
+      ' Ничего не делаем
+    Case 1
+      ' Замена общей части в путях
+      For i = 0 To List1.ListCount - 1
+        If List1.Selected(i) Then
+          lnkfile = List1.List(i)
+          lnk = GetLinkPath(lnkfile)
+          lnk = Text2.Text & Mid$(lnk, Len(BothPart) + 1, Len(lnk) - Len(BothPart) - 1)
+          SetLinkPath lnkfile, lnk
+        End If
+      Next
+    Case 2
+      ' Просто замена путей на новые
+      For i = 0 To List1.ListCount - 1
+        If List1.Selected(i) Then
+          lnkfile = List1.List(i)
+          SetLinkPath lnkfile, Text2.Text
+        End If
+      Next
+  End Select
 End If
 
 End Sub
 
-Private Sub Command4_Click()
+Private Sub mi_OpenFarFolder_Click()
 '
 ' Перебираем последовательно вверх каталоги, куда ссылается ярлык и открываем ближайший существующий
 
-Dim LnkFile As String
+Dim lnkfile As String
 Dim LnkPath As String
 Dim SlashPos As Long
 
-LnkFile = List1.List(List1.ListIndex)
-If FileExists(LnkFile) Then
-  LnkPath = GetLinkPath(LnkFile)
+lnkfile = List1.List(List1.ListIndex)
+If FileExists(lnkfile) Then
+  LnkPath = GetLinkPath(lnkfile)
     
   SlashPos = InStrRev(LnkPath, "\")
   If SlashPos = 0 Then Exit Sub
@@ -321,13 +397,80 @@ Private Sub List1_Click()
 '
 ' Клик по пункту списка - по битому ярлыку
 
-Dim LnkFile As String
+Dim SelectedLinks As New Collection
+Dim lnkfile As String
 Dim LnkPath As String
+Dim i As Long
+Dim j As Long
+Dim p As Long
+Dim CharA As String
+Dim CharB As String
+Dim FindDiff As Boolean
 
-LnkFile = List1.List(List1.ListIndex)
-If FileExists(LnkFile) Then
-  LnkPath = GetLinkPath(LnkFile)
-  Text2.Text = LnkPath
+' Если выделен один ярлык - просто отобразим ссылку из ярлыка
+' в противном случае выделим общую часть BothPart
+If List1.SelCount = 1 Then
+  BothPart = ""
+  lnkfile = List1.List(List1.ListIndex)
+  If FileExists(lnkfile) Then
+    LnkPath = GetLinkPath(lnkfile)
+    Text2.Text = LnkPath
+  End If
+Else
+  For i = 0 To List1.ListCount - 1
+    If List1.Selected(i) Then
+      SelectedLinks.Add GetLinkPath(List1.List(i))
+    End If
+  Next
+  ' Ищем общую часть
+  p = 1
+  FindDiff = False
+  Do While Not FindDiff
+    ' Берем очередной символ из первой строки, и сверяем с остальными
+    CharA = Mid$(SelectedLinks(1), p, 1)
+    For j = 2 To List1.SelCount
+      CharB = Mid$(SelectedLinks(j), p, 1)
+      If CharA <> CharB Then
+        FindDiff = True
+        Exit For
+      End If
+    Next
+    p = p + 1
+  Loop
+  BothPart = Mid$(SelectedLinks(1), 1, p - 2)
+  ' Отсечем символы до первой "\" в конце строки на случай, если начала имен
+  ' файлов или каталогов совпадают
+  BothPart = Left$(BothPart, InStrRev(BothPart, "\"))
+  Text2.Text = BothPart
+End If
+
+Set SelectedLinks = Nothing
+
+End Sub
+
+Private Sub List1_MouseUp(Button As Integer, Shift As Integer, X As Single, Y As Single)
+'
+' Контекстое меню на списке файлов
+
+
+If Button = 2 Then
+  ' Выделим элемент при клике правой кновкой мыши
+  ' Сделаю это потом
+  ' List1.TopIndex
+ 
+  If (List1.SelCount = 1) And (FileExists(List1.List(List1.TabIndex))) Then
+    mi_OpenLnkFile.Enabled = True
+    mi_OpenFarFolder.Enabled = True
+  Else
+    mi_OpenLnkFile.Enabled = False
+    mi_OpenFarFolder.Enabled = False
+  End If
+  If List1.ListCount > 0 Then
+    mi_SaveList.Enabled = True
+  Else
+    mi_SaveList.Enabled = False
+  End If
+  PopupMenu pm_List
 End If
 
 End Sub
@@ -371,8 +514,6 @@ Sub Form_Resize()
 
 Text1.Width = frmMain.Width - 2415
 List1.Width = frmMain.Width - 495
-Command2.Left = frmMain.Width - 5910
-Command4.Left = frmMain.Width - 3750
 Text2.Width = frmMain.Width - 1695
 Command3.Left = frmMain.Width - 1470
 List1.Height = frmMain.Height - 2760
@@ -381,3 +522,95 @@ Command3.Top = frmMain.Height - 1140
 
 End Sub
 
+Private Function SaveFileDialog() As String
+'
+' Вызываем диалог выбора файла для сохраненния
+
+Dim OFName As OPENFILENAME
+
+OFName.lStructSize = Len(OFName)
+OFName.lpstrFilter = "Text Files (*.txt)" + Chr$(0) + "*.txt" + Chr$(0) + "Все файлв (*.*)" + Chr$(0) + "*.*" + Chr$(0)
+OFName.lpstrFile = Space$(254)
+OFName.nMaxFile = 255
+OFName.lpstrFileTitle = Space$(254)
+OFName.nMaxFileTitle = 255
+OFName.lpstrInitialDir = App.path
+OFName.lpstrTitle = "Сохранение файла"
+OFName.flags = 0
+ 
+If GetSaveFileName(OFName) Then
+  SaveFileDialog = Trim$(OFName.lpstrFile)
+Else
+  SaveFileDialog = ""
+End If
+
+End Function
+
+Sub mi_SaveLnkFilesList_Click()
+'
+' Сохранение списка LNK файлов
+
+Dim FileToSave As String
+Dim SFile As Integer
+Dim i As Long
+SFile = FreeFile
+
+On Error GoTo err
+FileToSave = SaveFileDialog()
+If FileToSave <> "" Then
+  Open SFile For Output As SFile
+  For i = 0 To List1.ListCount - 1
+    Print #SFile, List1.List(i)
+  Next
+  Close SFile
+End If
+
+err:
+  MsgBox err.Description
+End Sub
+
+Sub mi_SaveDestFilesList_Click()
+'
+' Сохранение списка целей ярлыков
+
+Dim FileToSave As String
+Dim SFile As Integer
+Dim i As Long
+SFile = FreeFile
+
+On Error GoTo err
+FileToSave = SaveFileDialog()
+If FileToSave <> "" Then
+  Open SFile For Output As SFile
+  For i = 0 To List1.ListCount - 1
+    Print #SFile, GetLinkPath(List1.List(i))
+  Next
+  Close SFile
+End If
+
+err:
+  MsgBox err.Description
+End Sub
+
+Sub mi_SaveBothList_Click()
+'
+' Сохранение списка LNK файлов и их целей
+
+Dim FileToSave As String
+Dim SFile As Integer
+Dim i As Long
+SFile = FreeFile
+
+On Error GoTo err
+FileToSave = SaveFileDialog()
+If FileToSave <> "" Then
+  Open SFile For Output As SFile
+  For i = 0 To List1.ListCount - 1
+    Print #SFile, List1.List(i) & " <-> " & GetLinkPath(List1.List(i))
+  Next
+  Close SFile
+End If
+
+err:
+  MsgBox err.Description
+End Sub
