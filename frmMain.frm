@@ -80,7 +80,7 @@ Begin VB.Form frmMain
       Left            =   2280
       TabIndex        =   3
       Top             =   945
-      Width           =   6015
+      Width           =   7095
    End
    Begin VB.Menu pm_List 
       Caption         =   "й"
@@ -94,13 +94,13 @@ Begin VB.Form frmMain
       Begin VB.Menu mi_SaveList 
          Caption         =   "Сохранить список ярлыков с файл"
          Begin VB.Menu mi_SaveLnkFilesList 
-            Caption         =   "Список LNK файлв"
+            Caption         =   "Список Lnk файлв"
          End
          Begin VB.Menu mi_SaveDestFilesList 
             Caption         =   "Список целей ярлыков"
          End
          Begin VB.Menu mi_SaveBothList 
-            Caption         =   "И то и то"
+            Caption         =   "Lnk фал <-> цель"
          End
       End
    End
@@ -174,6 +174,7 @@ Dim FilesCount As Long
 Dim LnkCount As Long
 Dim BadLnk As Long
 Dim BothPart As String
+Dim InitialDir As String
 
 Private Function GetLinkPath(ByVal lnk As String) As String
 '
@@ -188,17 +189,49 @@ On Error Resume Next
   
 End Function
 
-Private Sub SetLinkPath(ByVal lnkfile As String, ByVal lnk As String)
+Private Sub SetLinkPath(ByVal lnkFile As String, ByVal lnk As String)
 '
 ' Изменение пути, на который ссылается ярлык
 
 On Error Resume Next
-  With CreateObject("Wscript.Shell").CreateShortcut(lnkfile)
+  With CreateObject("Wscript.Shell").CreateShortcut(lnkFile)
     .TargetPath = Text2.Text
     .Save
     .Close
   End With
   
+End Sub
+
+Private Function IsRealyLnk(ByVal lnkFile As String) As Boolean
+'
+' Проверка действительно ли этот файл является Shell Link (.LNK) Binary File
+' См. http://msdn.microsoft.com/en-us/library/dd871305.aspx
+
+Dim SFile As Integer
+Dim Readed4 As Long
+
+SFile = FreeFile
+Open lnkFile For Binary Access Read As SFile
+Get SFile, , Readed4
+' Первые 4 байта должны быть 0x0000004C
+If Readed4 <> 76 Then Exit Function
+' Следующие 16 байт должны быть 00021401-0000-0000-C000-000000000046
+Get SFile, , Readed4: If Readed4 <> 136193 Then Exit Function
+Get SFile, , Readed4: If Readed4 <> 0 Then Exit Function
+Get SFile, , Readed4: If Readed4 <> 192 Then Exit Function
+Get SFile, , Readed4: If Readed4 <> 1174405120 Then Exit Function
+Close SFile
+
+IsRealyLnk = True
+
+Exit Function
+err:
+  ' Нет доступа или еще чего-нибудь, не важно, для нас это не ярлык
+  IsRealyLnk = False
+End Function
+
+Private Sub Command1_Click()
+ MsgBox IsRealyLnk("\\Prim-fs-serv\rdu\СРЗА\ТКЗ\Линии\Архив\ЛЭП 110 кВ ВТЭЦ-1 - Орлиная (перспектива)\Программма Параметр\ВЛ 110 кВ А-Голубинка-Орлиная-ВТЭЦ-1 исх.lnk")
 End Sub
 
 Private Function FileExists(ByVal strFileName As String) As Boolean
@@ -221,6 +254,21 @@ If dotPoint > 0 Then
   ExtractFileExt = Right$(strUp, Len(strUp) - dotPoint)
 Else
   ExtractFileExt = ""
+End If
+  
+End Function
+
+Private Function ExtractFilePath(ByVal strPath As String) As String
+'
+' Получение каталога файла
+
+Dim slash_pos As Long
+
+slash_pos = InStrRev(Replace$(strPath, "/", "\"), "\")
+If slash_pos > 0 Then
+  ExtractFilePath = Left$(strPath, Len(strPath) - slash_pos)
+Else
+  ExtractFilePath = ""
 End If
   
 End Function
@@ -258,12 +306,14 @@ If hSearch <> INVALID_HANDLE_VALUE Then
         FilesCount = FilesCount + 1
         FileName = objName
         FileExt = ExtractFileExt(objName)
-        If FileExt = "LNK" Then
-          LnkCount = LnkCount + 1
-          LnkPath = GetLinkPath(path & FileName)
-          If Not FileExists(LnkPath) Then
-            BadLnk = BadLnk + 1
-            List1.AddItem (path & FileName)
+        If (FileExt = "LNK") Then
+          If IsRealyLnk(path & FileName) Then  ' В VB6 нет частичного вычисления!
+            LnkCount = LnkCount + 1
+            LnkPath = GetLinkPath(path & FileName)
+            If Not FileExists(LnkPath) Then
+              BadLnk = BadLnk + 1
+              List1.AddItem (path & FileName)
+            End If
           End If
         End If
       End If
@@ -311,10 +361,10 @@ Private Sub mi_OpenLnkFile_Click()
 '
 ' Открыть каталог с ярлыком и выделить его
 
-Dim lnkfile As String
+Dim lnkFile As String
 
-lnkfile = List1.List(List1.ListIndex)
-If FileExists(lnkfile) Then ShellExecute frmMain.hwnd, "OPEN", "EXPLORER", "/select, " & lnkfile, 0, SW_SHOWNORMAL
+lnkFile = List1.List(List1.ListIndex)
+If FileExists(lnkFile) Then ShellExecute frmMain.hwnd, "OPEN", "EXPLORER", "/select, " & lnkFile, 0, SW_SHOWNORMAL
   
 End Sub
 
@@ -322,7 +372,7 @@ Private Sub Command3_Click()
 '
 ' Вносим изменения в ярлык
 
-Dim lnkfile As String
+Dim lnkFile As String
 Dim lnk As String
 Dim i As Long
 
@@ -333,9 +383,9 @@ Dim i As Long
 ' ярлыков ссылаются на один файл
 
 If List1.SelCount = 1 Then
-  lnkfile = List1.List(List1.ListIndex)
-  If FileExists(lnkfile) Then
-    SetLinkPath lnkfile, Text2.Text
+  lnkFile = List1.List(List1.ListIndex)
+  If FileExists(lnkFile) Then
+    SetLinkPath lnkFile, Text2.Text
   End If
 Else
   ' Подготовим информативное сообщение для пользователя, чтобы не запутался
@@ -348,18 +398,18 @@ Else
       ' Замена общей части в путях
       For i = 0 To List1.ListCount - 1
         If List1.Selected(i) Then
-          lnkfile = List1.List(i)
-          lnk = GetLinkPath(lnkfile)
+          lnkFile = List1.List(i)
+          lnk = GetLinkPath(lnkFile)
           lnk = Text2.Text & Mid$(lnk, Len(BothPart) + 1, Len(lnk) - Len(BothPart) - 1)
-          SetLinkPath lnkfile, lnk
+          SetLinkPath lnkFile, lnk
         End If
       Next
     Case 2
       ' Просто замена путей на новые
       For i = 0 To List1.ListCount - 1
         If List1.Selected(i) Then
-          lnkfile = List1.List(i)
-          SetLinkPath lnkfile, Text2.Text
+          lnkFile = List1.List(i)
+          SetLinkPath lnkFile, Text2.Text
         End If
       Next
   End Select
@@ -371,13 +421,13 @@ Private Sub mi_OpenFarFolder_Click()
 '
 ' Перебираем последовательно вверх каталоги, куда ссылается ярлык и открываем ближайший существующий
 
-Dim lnkfile As String
+Dim lnkFile As String
 Dim LnkPath As String
 Dim SlashPos As Long
 
-lnkfile = List1.List(List1.ListIndex)
-If FileExists(lnkfile) Then
-  LnkPath = GetLinkPath(lnkfile)
+lnkFile = List1.List(List1.ListIndex)
+If FileExists(lnkFile) Then
+  LnkPath = GetLinkPath(lnkFile)
     
   SlashPos = InStrRev(LnkPath, "\")
   If SlashPos = 0 Then Exit Sub
@@ -398,7 +448,7 @@ Private Sub List1_Click()
 ' Клик по пункту списка - по битому ярлыку
 
 Dim SelectedLinks As New Collection
-Dim lnkfile As String
+Dim lnkFile As String
 Dim LnkPath As String
 Dim i As Long
 Dim j As Long
@@ -411,9 +461,9 @@ Dim FindDiff As Boolean
 ' в противном случае выделим общую часть BothPart
 If List1.SelCount = 1 Then
   BothPart = ""
-  lnkfile = List1.List(List1.ListIndex)
-  If FileExists(lnkfile) Then
-    LnkPath = GetLinkPath(lnkfile)
+  lnkFile = List1.List(List1.ListIndex)
+  If FileExists(lnkFile) Then
+    LnkPath = GetLinkPath(lnkFile)
     Text2.Text = LnkPath
   End If
 Else
@@ -519,14 +569,16 @@ Command3.Left = frmMain.Width - 1470
 List1.Height = frmMain.Height - 2760
 Text2.Top = frmMain.Height - 1140
 Command3.Top = frmMain.Height - 1140
+Line1.X2 = frmMain.Width + 5000
 
 End Sub
 
-Private Function SaveFileDialog() As String
+Private Function SaveFileDialog(InitialDir As String) As String
 '
 ' Вызываем диалог выбора файла для сохраненния
 
 Dim OFName As OPENFILENAME
+If InitialDir = "" Then InitialDir = App.path
 
 OFName.lStructSize = Len(OFName)
 OFName.lpstrFilter = "Text Files (*.txt)" + Chr$(0) + "*.txt" + Chr$(0) + "Все файлв (*.*)" + Chr$(0) + "*.*" + Chr$(0)
@@ -534,7 +586,7 @@ OFName.lpstrFile = Space$(254)
 OFName.nMaxFile = 255
 OFName.lpstrFileTitle = Space$(254)
 OFName.nMaxFileTitle = 255
-OFName.lpstrInitialDir = App.path
+OFName.lpstrInitialDir = InitialDir
 OFName.lpstrTitle = "Сохранение файла"
 OFName.flags = 0
  
@@ -556,15 +608,17 @@ Dim i As Long
 SFile = FreeFile
 
 On Error GoTo err
-FileToSave = SaveFileDialog()
+FileToSave = SaveFileDialog(InitialDir)
+InitialDir = ExtractFilePath(FileToSave)
 If FileToSave <> "" Then
-  Open SFile For Output As SFile
+  Open FileToSave For Output As SFile
   For i = 0 To List1.ListCount - 1
     Print #SFile, List1.List(i)
   Next
   Close SFile
 End If
 
+Exit Sub
 err:
   MsgBox err.Description
 End Sub
@@ -579,15 +633,17 @@ Dim i As Long
 SFile = FreeFile
 
 On Error GoTo err
-FileToSave = SaveFileDialog()
+FileToSave = SaveFileDialog(InitialDir)
+InitialDir = ExtractFilePath(FileToSave)
 If FileToSave <> "" Then
-  Open SFile For Output As SFile
+  Open FileToSave For Output As SFile
   For i = 0 To List1.ListCount - 1
     Print #SFile, GetLinkPath(List1.List(i))
   Next
   Close SFile
 End If
 
+Exit Sub
 err:
   MsgBox err.Description
 End Sub
@@ -602,15 +658,17 @@ Dim i As Long
 SFile = FreeFile
 
 On Error GoTo err
-FileToSave = SaveFileDialog()
+FileToSave = SaveFileDialog(InitialDir)
+InitialDir = ExtractFilePath(FileToSave)
 If FileToSave <> "" Then
-  Open SFile For Output As SFile
+  Open FileToSave For Output As SFile
   For i = 0 To List1.ListCount - 1
     Print #SFile, List1.List(i) & " <-> " & GetLinkPath(List1.List(i))
   Next
   Close SFile
 End If
 
+Exit Sub
 err:
   MsgBox err.Description
 End Sub
