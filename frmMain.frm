@@ -22,7 +22,7 @@ Begin VB.Form frmMain
       Left            =   120
       TabIndex        =   4
       Top             =   9600
-      Width           =   15255
+      Width           =   14655
    End
    Begin VB.CommandButton cmdStartStop 
       Caption         =   "Старт"
@@ -58,6 +58,14 @@ Begin VB.Form frmMain
       Text            =   "\\Prim-fs-serv\rdu\СРЗА\ТКЗ\Линии\"
       Top             =   100
       Width           =   14535
+   End
+   Begin VB.Shape Shape1 
+      FillColor       =   &H00C0C0C0&
+      FillStyle       =   0  'Заливка
+      Height          =   400
+      Left            =   14880
+      Top             =   9600
+      Width           =   500
    End
    Begin VB.Line Line1 
       BorderColor     =   &H80000006&
@@ -480,7 +488,7 @@ Else
     CharA = Mid$(SelectedLinks(1), p, 1)
     For j = 2 To List1.SelCount
       CharB = Mid$(SelectedLinks(j), p, 1)
-      If CharA <> CharB Then
+      If UCase(CharA) <> UCase(CharB) Then
         FindDiff = True
         Exit For
       End If
@@ -495,6 +503,14 @@ Else
 End If
 
 Set SelectedLinks = Nothing
+
+End Sub
+
+Private Sub List1_KeyPress(KeyAscii As Integer)
+'
+' При нажатии любой кнопки клавиатуры обработаем клик
+
+Call List1_Click
 
 End Sub
 
@@ -564,10 +580,12 @@ Sub Form_Resize()
 
 Text1.Width = frmMain.Width - 2415
 List1.Width = frmMain.Width - 495
-Text2.Width = frmMain.Width - 1695
+Text2.Width = frmMain.Width - 1695 - 500
+Shape1.Left = frmMain.Width - 1695 - 350
 Command3.Left = frmMain.Width - 1470
 List1.Height = frmMain.Height - 2760
 Text2.Top = frmMain.Height - 1140
+Shape1.Top = frmMain.Height - 1140
 Command3.Top = frmMain.Height - 1140
 Line1.X2 = frmMain.Width + 5000
 
@@ -671,4 +689,17 @@ End If
 Exit Sub
 err:
   MsgBox err.Description
+End Sub
+
+Private Sub Text2_Change()
+'
+' При редактировании пути, куда ссылается ярлык отобразим существует ли этот
+' файл или папка
+
+If FileExists(Text2.Text) Then
+  Shape1.FillColor = &H8000&
+Else
+   Shape1.FillColor = &HC0&
+End If
+
 End Sub
