@@ -578,16 +578,18 @@ Sub Form_Resize()
 '
 ' Масштабирование окна
 
-Text1.Width = frmMain.Width - 2415
-List1.Width = frmMain.Width - 495
-Text2.Width = frmMain.Width - 1695 - 500
-Shape1.Left = frmMain.Width - 1695 - 350
-Command3.Left = frmMain.Width - 1470
-List1.Height = frmMain.Height - 2760
-Text2.Top = frmMain.Height - 1140
-Shape1.Top = frmMain.Height - 1140
-Command3.Top = frmMain.Height - 1140
-Line1.X2 = frmMain.Width + 5000
+If Me.WindowState <> 1 Then
+  Text1.Width = frmMain.Width - 2415
+  List1.Width = frmMain.Width - 495
+  Text2.Width = frmMain.Width - 1695 - 500
+  Shape1.Left = frmMain.Width - 1695 - 350
+  Command3.Left = frmMain.Width - 1470
+  List1.Height = frmMain.Height - 2760
+  Text2.Top = frmMain.Height - 1140
+  Shape1.Top = frmMain.Height - 1140
+  Command3.Top = frmMain.Height - 1140
+  Line1.X2 = frmMain.Width + 5000
+End If
 
 End Sub
 
